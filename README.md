@@ -29,7 +29,7 @@ upload check all verified live, not just in tests.
 
 > **Note on this build:** every piece below (parsing, normalisation, idempotent
 > ingestion, rule-based categorisation, transfer matching, pagination, summaries)
-> is implemented and covered by its own unit/integration tests — 31 tests, all
+> is implemented and covered by its own unit/integration tests — 34 tests, all
 > green. Option B above has been exercised live. **Option A (`docker compose
 > up` against real PostgreSQL) has not** — Docker Desktop's backend was
 > unresponsive on this machine the whole time this was built. Run it once on a
@@ -66,6 +66,36 @@ inserts zero new rows for the rows already seen; see
 
 (The exact SQL differs slightly from the spec's `ON CONFLICT DO NOTHING`
 sketch — see **Implementation note** below for why.)
+
+## PDF statements (not just CSV)
+
+Real bank statement exports are usually PDF, not CSV. `POST /statements/pdf`
+accepts the raw PDF and runs it through the same pipeline.
+
+PDF text extraction has no concept of a table — a visual row becomes a flat
+stream of lines in whatever order the PDF's internal layout used, interleaved
+with boilerplate (terminal numbers, reference numbers, masked card numbers,
+VAT lines) between each real transaction. `PdfStatementParser` finds each
+transaction by anchoring on the two parts that are always present — the
+amount/merchant line, and a bit further on, the date + Arabic transaction-type
++ time line — and skips everything in between rather than matching every
+field.
+
+Arabic PDFs frequently extract as **Arabic Presentation Forms**: visually
+identical to standard Arabic letters but different Unicode code points (a
+font-rendering artifact, not a bug in the regex). Without folding them back
+first, a correctly-written Arabic pattern simply never matches anything.
+`PdfStatementParser` runs Unicode NFKC normalisation on the extracted text
+before matching, which fixes this independent of which PDF producer the bank
+used.
+
+Only one transaction wording is recognised today — "شراء" (purchase, via
+mada/Apple Pay POS) — because that is the only real example seen so far (see
+`PdfStatementParserTest`, built from an actual anonymised statement excerpt).
+Salary deposits, transfers and ATM withdrawals will use different Arabic
+wording and are reported as unrecognised (not mis-parsed as the wrong
+direction) until a real example of each is added to
+`PdfStatementParser.DIRECTION_BY_KEYWORD`.
 
 ## How categorisation works
 
@@ -105,6 +135,14 @@ logs; only the fingerprint (a hash) and file hash do.
 - **No authentication on any endpoint.** Fine for a single-user app reachable
   only on your own local network; not fine if you expose this beyond that
   without adding one.
+- **PDF parsing only knows one transaction wording** (mada/Apple Pay POS
+  purchases) and **has not been run against a real multi-page PDF file** —
+  only against a real extracted-text excerpt (`PdfStatementParserTest`'s
+  fixture). The full PDF is loaded and its text extracted in one pass rather
+  than streamed page-by-page; fine at the ~41-page scale mentioned when this
+  was built, since splitting by page risked cutting a transaction's block in
+  half across a page boundary. Revisit if a statement turns out to be
+  hundreds of pages.
 
 ## Implementation note: why not `ON CONFLICT DO NOTHING` verbatim
 
@@ -145,8 +183,9 @@ Java 21, Spring Boot 3.3, PostgreSQL 16, Flyway, Maven, JUnit 5 + AssertJ, H2
 ./mvnw test
 ```
 
-31 tests: `StatementParserTest`, `DescriptionNormaliserTest` (13 cases
-covering every normalisation step plus the bilingual example),
-`FingerprintTest`, `IngestionServiceIdempotencyTest` (the triple-upload
-proof), `RuleEngineTest`, `TransferMatcherTest` (including the tricky
-same-amount-same-direction negative case).
+34 tests: `StatementParserTest`, `PdfStatementParserTest` (built from a real
+anonymised statement excerpt), `DescriptionNormaliserTest` (13 cases covering
+every normalisation step plus the bilingual example), `FingerprintTest`,
+`IngestionServiceIdempotencyTest` (the triple-upload proof), `RuleEngineTest`,
+`TransferMatcherTest` (including the tricky same-amount-same-direction
+negative case).

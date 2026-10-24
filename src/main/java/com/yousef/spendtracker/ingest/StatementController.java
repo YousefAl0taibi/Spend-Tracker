@@ -26,4 +26,9 @@ public class StatementController {
         ColumnMapping columnMapping = statementProperties.require(mapping);
         return ingestionService.ingest(file, columnMapping);
     }
+
+    @PostMapping("/pdf")
+    public IngestionResponse uploadPdf(@RequestParam("file") MultipartFile file) throws IOException {
+        return ingestionService.ingestPdf(file);
+    }
 }

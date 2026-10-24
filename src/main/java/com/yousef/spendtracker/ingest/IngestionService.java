@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * Ties parsing, normalisation, categorisation, fingerprinting and idempotent
  * persistence together. This is the only place that decides what counts as
- * "the same transaction".
+ * "the same transaction" — for both statement formats it accepts (CSV and PDF).
  */
 @Service
 public class IngestionService {
@@ -29,15 +29,18 @@ public class IngestionService {
     /** Single-user app: everything lands in the one account seeded by V1__init.sql. */
     private static final long DEFAULT_ACCOUNT_ID = 1L;
 
-    private final StatementParser parser;
+    private final StatementParser csvParser;
+    private final PdfStatementParser pdfParser;
     private final DescriptionNormaliser normaliser;
     private final RuleEngine ruleEngine;
     private final CategoryRepository categoryRepository;
     private final TransactionInserter transactionInserter;
 
-    public IngestionService(StatementParser parser, DescriptionNormaliser normaliser, RuleEngine ruleEngine,
+    public IngestionService(StatementParser csvParser, PdfStatementParser pdfParser,
+                             DescriptionNormaliser normaliser, RuleEngine ruleEngine,
                              CategoryRepository categoryRepository, TransactionInserter transactionInserter) {
-        this.parser = parser;
+        this.csvParser = csvParser;
+        this.pdfParser = pdfParser;
         this.normaliser = normaliser;
         this.ruleEngine = ruleEngine;
         this.categoryRepository = categoryRepository;
@@ -50,9 +53,25 @@ public class IngestionService {
 
         ParseResult parseResult;
         try (Reader reader = new InputStreamReader(new ByteArrayInputStream(content), StandardCharsets.UTF_8)) {
-            parseResult = parser.parse(reader, mapping);
+            parseResult = csvParser.parse(reader, mapping);
         }
 
+        return ingestParsedRows(parseResult, fileHash);
+    }
+
+    public IngestionResponse ingestPdf(MultipartFile file) throws IOException {
+        byte[] content = file.getBytes();
+        String fileHash = DigestUtils.sha256Hex(content);
+
+        ParseResult parseResult;
+        try (var pdfStream = new ByteArrayInputStream(content)) {
+            parseResult = pdfParser.parse(pdfStream);
+        }
+
+        return ingestParsedRows(parseResult, fileHash);
+    }
+
+    private IngestionResponse ingestParsedRows(ParseResult parseResult, String fileHash) {
         int inserted = 0;
         for (ParsedRow row : parseResult.rows()) {
             String normalisedDescription = normaliser.normalise(row.rawDescription());
