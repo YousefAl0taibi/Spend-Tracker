@@ -1,8 +1,7 @@
 # Spend Tracker
 
-A personal spending tracker that ingests bank statement CSV exports **and/or**
-bank SMS notifications, cleans and categorises the transactions, stores them,
-and serves them over a REST API.
+A personal spending tracker that ingests bank statement CSV exports, cleans and
+categorises the transactions, stores them, and serves them over a REST API.
 
 ## Quickstart
 
@@ -13,13 +12,12 @@ curl -F "file=@samples/sample-statement.csv" \
 ```
 
 > **Note on this build:** every piece below (parsing, normalisation, idempotent
-> ingestion, rule-based categorisation, transfer matching, pagination, summaries,
-> SMS ingestion) is implemented and covered by its own unit/integration tests —
-> 36 tests, all green, run against an H2 in-memory database. `docker compose up`
-> itself has **not** been exercised end-to-end on this machine because Docker
-> Desktop's backend was unresponsive at the time this was built. Run it once on
-> a machine with a working Docker install to get the real numbers for the CV
-> lines below.
+> ingestion, rule-based categorisation, transfer matching, pagination, summaries)
+> is implemented and covered by its own unit/integration tests — 31 tests,
+> all green, run against an H2 in-memory database. `docker compose up` itself
+> has **not** been exercised end-to-end on this machine because Docker Desktop's
+> backend was unresponsive at the time this was built. Run it once on a machine
+> with a working Docker install to get the real numbers for the CV lines below.
 
 ```bash
 curl "http://localhost:8080/summary/monthly?year=2026"
@@ -51,47 +49,6 @@ inserts zero new rows for the rows already seen; see
 
 (The exact SQL differs slightly from the spec's `ON CONFLICT DO NOTHING`
 sketch — see **Implementation note** below for why.)
-
-## Automatic capture from bank SMS (no file upload)
-
-`POST /sms` accepts `{ "text": "<raw SMS>" }` and runs the same normalise →
-categorise → fingerprint → insert pipeline as a file upload (`TransactionIngestor`
-is the shared core both paths call). This app has **no access to your phone's
-SMS inbox by itself** — nothing can, short of a native mobile app with SMS
-permission — so getting the text here is a one-time setup on your phone:
-
-1. Install an on-device automation app that can read incoming SMS and make an
-   HTTP request — **Tasker** or **MacroDroid** on Android (there is no way to
-   read SMS from a third-party app on iOS; Apple does not allow it).
-2. Create a rule: **trigger** = "SMS Received" (optionally filtered to your
-   bank's sender ID), **action** = HTTP POST to
-   `http://<this-machine's-local-IP>:8080/sms` with a JSON body
-   `{ "text": "%SMSRB" }` (Tasker's variable for the received SMS body;
-   MacroDroid's equivalent is `[sms_message]`).
-3. That's it — no cloud relay, no third-party SMS gateway, no extra server.
-   The phone talks straight to this backend over your own local network (same
-   WiFi, or a Tailscale/WireGuard link if you want it reachable away from home).
-
-Each bank's wording is one entry under `sms.templates` in `application.yml` —
-a regex with four named groups (`amount`, `merchant`, `date`, `time`) plus a
-fixed `direction` and `dateFormat`, exactly the same "config, not code" idea as
-`statement.mappings`. The one shipped here matches a mada/Apple Pay purchase
-SMS:
-
-```
-شراء-POS
-بـ2.50 SAR
-من SHUMOOKH
-مدى-ابل*5012
-في 24/10/26 16:25
-```
-
-An SMS that matches no configured template (an OTP, a promo text, a bank
-nobody has added a template for yet) is reported as `"recognised": false` and
-never touches the database — it is not an error, just "not a transaction".
-**Only this one purchase template exists today.** Other message shapes from
-the same bank (salary deposits, transfers, ATM withdrawals) need their own
-template added the same way once you have a real example of their wording.
 
 ## How categorisation works
 
@@ -128,12 +85,6 @@ logs; only the fingerprint (a hash) and file hash do.
   doesn't currently expose a way to pick an account per upload.
 - **Rule accuracy is unmeasured.** See above — no labelled corrections exist
   yet on this build.
-- **SMS capture needs a phone-side app this repo doesn't contain.** `POST
-  /sms` is tested end-to-end as a backend endpoint, but actually feeding it
-  live requires setting up Tasker/MacroDroid yourself (see **Automatic
-  capture from bank SMS** above) and only works on Android. Only one SMS
-  wording (a mada/Apple Pay POS purchase) has a template; anything else your
-  bank texts you is currently reported as unrecognised, not mis-parsed.
 - **No authentication on any endpoint.** Fine for a single-user app reachable
   only on your own local network; not fine if you expose this beyond that
   without adding one.
@@ -177,9 +128,8 @@ Java 21, Spring Boot 3.3, PostgreSQL 16, Flyway, Maven, JUnit 5 + AssertJ, H2
 ./mvnw test
 ```
 
-36 tests: `StatementParserTest`, `DescriptionNormaliserTest` (13 cases
+31 tests: `StatementParserTest`, `DescriptionNormaliserTest` (13 cases
 covering every normalisation step plus the bilingual example),
 `FingerprintTest`, `IngestionServiceIdempotencyTest` (the triple-upload
 proof), `RuleEngineTest`, `TransferMatcherTest` (including the tricky
-same-amount-same-direction negative case), `SmsParserTest`, and
-`SmsIngestionServiceTest` (same idempotency proof, via SMS instead of a file).
+same-amount-same-direction negative case).
