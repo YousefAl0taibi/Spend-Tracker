@@ -4,4 +4,10 @@ INSERT INTO category (name_en, name_ar) VALUES
     ('Dining', 'مطاعم'),
     ('Subscriptions', 'اشتراكات'),
     ('Salary', 'راتب'),
-    ('Uncategorised', 'غير مصنف');
+    ('Uncategorised', 'غير مصنف'),
+    ('Shopping', 'تسوق'),
+    ('Health', 'صحة'),
+    ('Transport', 'تنقل'),
+    ('Automotive', 'سيارات'),
+    ('Pets', 'حيوانات'),
+    ('Entertainment', 'ترفيه');

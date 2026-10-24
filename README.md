@@ -97,6 +97,30 @@ wording and are reported as unrecognised (not mis-parsed as the wrong
 direction) until a real example of each is added to
 `PdfStatementParser.DIRECTION_BY_KEYWORD`.
 
+## Categorisation by Merchant Category Code (MCC) — no merchant-name list needed
+
+Every mada/Visa/Mastercard POS transaction already carries a 4-digit Merchant
+Category Code (MCC) assigned by the card network itself — e.g. `5411` for a
+grocery store, `5814` for fast food. `PdfStatementParser` extracts it from the
+statement, and `MccCategoryLookup` maps it straight to a category: no merchant
+name list to maintain, no external lookup, no API, nothing sent anywhere.
+
+This was a direct answer to "shouldn't this generalise instead of listing
+merchant names" — MCC generalises for free because it's already in the data.
+Verified against a real statement: before MCC-based categorisation, **100%**
+of 72 real transactions came back `Uncategorised` (the `rules.yml`
+merchant-name patterns were all placeholder examples — `TAMIMI`, `ALDREES` —
+that never matched this user's real merchants). After: only **~12%** stayed
+`Uncategorised`, the rest correctly split across Dining, Groceries, Shopping,
+Fuel, Pets, Health, Automotive and Transport, entirely from MCC codes already
+present in the real file.
+
+`RuleEngine`'s merchant-name matching still runs as the fallback for sources
+with no MCC (CSV exports) or an MCC this table doesn't cover yet. The mapping
+table's descriptions were verified against
+[Checkout.com's MCC reference](https://www.checkout.com/docs/resources/codes/merchant-category-codes)
+before being hardcoded, not taken from memory.
+
 ## How categorisation works
 
 `rules.yml` lists categories as data, each with a priority and a list of

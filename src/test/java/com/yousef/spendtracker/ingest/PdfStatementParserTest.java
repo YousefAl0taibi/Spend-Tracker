@@ -33,19 +33,23 @@ class PdfStatementParserTest {
         assertThat(first.amount()).isEqualByComparingTo(new BigDecimal("20.00"));
         assertThat(first.rawDescription()).isEqualTo("AlFaiha");
         assertThat(first.direction()).isEqualTo(Direction.DEBIT);
+        assertThat(first.mccCode()).isEqualTo("5995");
 
         ParsedRow second = result.rows().get(1);
         assertThat(second.rawDescription()).isEqualTo("Al Khaleej Dis");
         assertThat(second.amount()).isEqualByComparingTo(new BigDecimal("29.97"));
+        assertThat(second.mccCode()).isEqualTo("5411");
 
         ParsedRow third = result.rows().get(2);
         assertThat(third.rawDescription()).isEqualTo("eshbelya alhassan bin");
         assertThat(third.amount()).isEqualByComparingTo(new BigDecimal("21.45"));
+        assertThat(third.mccCode()).isEqualTo("5411");
 
         ParsedRow fourth = result.rows().get(3);
         assertThat(fourth.rawDescription()).isEqualTo("Boulevard World");
         assertThat(fourth.amount()).isEqualByComparingTo(new BigDecimal("30.00"));
         assertThat(fourth.bookedOn()).isEqualTo(LocalDate.of(2026, 9, 9));
+        assertThat(fourth.mccCode()).isEqualTo("5814");
     }
 
     @Test
@@ -58,7 +62,7 @@ class PdfStatementParserTest {
 
     @Test
     void unrecognisedTransactionTypeIsReportedNotGuessed() {
-        String block = "100.00 10.00 ,SOME MERCHANT رقم الشاشة 123 "
+        String block = "100.00 10.00 ,SOME MERCHANT رقم الشاشة 123 MCC-5999 "
                 + "01/01/2026 تحويل مستلم 09:00"; // "تحويل مستلم" (transfer received) — no rule for it yet
 
         ParseResult result = parser.parse(block);

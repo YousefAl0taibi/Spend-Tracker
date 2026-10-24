@@ -1,6 +1,7 @@
 package com.yousef.spendtracker.ingest;
 
 import com.yousef.spendtracker.categorise.CategoryGuess;
+import com.yousef.spendtracker.categorise.MccCategoryLookup;
 import com.yousef.spendtracker.categorise.RuleEngine;
 import com.yousef.spendtracker.normalise.DescriptionNormaliser;
 import com.yousef.spendtracker.transaction.Category;
@@ -77,7 +78,7 @@ public class IngestionService {
             String normalisedDescription = normaliser.normalise(row.rawDescription());
             String fingerprint = Fingerprint.of(DEFAULT_ACCOUNT_ID, row.bookedOn(), row.amount(),
                     row.direction(), row.rawDescription());
-            Long categoryId = guessCategoryId(normalisedDescription, row.direction());
+            Long categoryId = guessCategoryId(normalisedDescription, row.direction(), row.mccCode());
 
             Transaction transaction = new Transaction(DEFAULT_ACCOUNT_ID, row.bookedOn(), row.rawDescription(),
                     normalisedDescription, row.amount(), row.direction(), fingerprint, fileHash);
@@ -95,7 +96,15 @@ public class IngestionService {
         return new IngestionResponse(parseResult.rows().size(), inserted, duplicates, fileHash, parseResult.errors());
     }
 
-    private Long guessCategoryId(String normalisedDescription, Direction direction) {
+    /** MCC (present on PDF card transactions) decides first; CSV rows have none and fall back to RuleEngine. */
+    private Long guessCategoryId(String normalisedDescription, Direction direction, String mccCode) {
+        if (mccCode != null) {
+            var mccCategory = MccCategoryLookup.categoryNameFor(mccCode);
+            if (mccCategory.isPresent()) {
+                return categoryRepository.findByNameEn(mccCategory.get()).map(Category::getId).orElse(null);
+            }
+        }
+
         CategoryGuess guess = ruleEngine.categorise(normalisedDescription, direction);
         return categoryRepository.findByNameEn(guess.nameEn())
                 .map(Category::getId)

@@ -46,7 +46,7 @@ public class PdfStatementParser {
      */
     private static final Pattern TRANSACTION_BLOCK = Pattern.compile(
             "(?<balance>[0-9,]+\\.\\d{2})\\s+(?<amount>[0-9,]+\\.\\d{2})\\s*,\\s*(?<merchant>.+?)\\s+"
-                    + "رقم\\s*الشاشة.*?"
+                    + "رقم\\s*الشاشة.*?MCC-(?<mcc>\\d{4}).*?"
                     + "(?<date>\\d{1,2}/\\d{1,2}/\\d{4})\\s+(?<type>.+?)\\s+(?<time>\\d{1,2}:\\d{2})");
 
     /** "شراء" (purchase). Other wordings (salary, transfer, ATM) need their own entry once seen. */
@@ -88,6 +88,7 @@ public class PdfStatementParser {
         String merchant = matcher.group("merchant").trim();
         LocalDate bookedOn = LocalDate.parse(matcher.group("date"), DATE_FORMAT);
         String type = matcher.group("type").trim();
+        String mccCode = matcher.group("mcc");
 
         Direction direction = DIRECTION_BY_KEYWORD.entrySet().stream()
                 .filter(entry -> type.contains(entry.getKey()))
@@ -95,6 +96,6 @@ public class PdfStatementParser {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unrecognised transaction type: " + type));
 
-        return new ParsedRow(bookedOn, merchant, amount, direction);
+        return new ParsedRow(bookedOn, merchant, amount, direction, mccCode);
     }
 }
