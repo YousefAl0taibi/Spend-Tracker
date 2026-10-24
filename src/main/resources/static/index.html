@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>متتبّع المصاريف</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2d;
+    --panel-border: #2a3348;
+    --text: #e7ecf5;
+    --muted: #8d97ab;
+    --accent: #4f8dfd;
+    --accent-2: #39c98f;
+    --danger: #ef5b6a;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, select {
+    background: #0f1420;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    width: 100%;
+  }
+  .row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 10px; }
+  .row > div { flex: 1; min-width: 120px; }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:hover { opacity: 0.9; }
+  button.secondary { background: #2a3348; }
+  .msg { font-size: 13px; margin-top: 8px; min-height: 18px; }
+  .msg.ok { color: var(--accent-2); }
+  .msg.err { color: var(--danger); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--panel-border); }
+  th { color: var(--muted); font-weight: 600; }
+  .amount-debit { color: var(--danger); }
+  .amount-credit { color: var(--accent-2); }
+  .pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; justify-content: center; }
+  .pager span { color: var(--muted); font-size: 13px; }
+  .totals { display: flex; gap: 20px; margin-bottom: 14px; flex-wrap: wrap; }
+  .totals .stat { font-size: 13px; color: var(--muted); }
+  .totals .stat b { display: block; font-size: 20px; color: var(--text); font-weight: 600; }
+  canvas { max-height: 260px; }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #2a3348; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>متتبّع المصاريف</h1>
+<p class="subtitle">لوحة بسيطة فوق REST API الموجود — لا تخزّن شيئًا بنفسها، كل البيانات من السيرفر مباشرة.</p>
+
+<div class="grid">
+  <div class="panel">
+    <h2>رفع كشف حساب (CSV)</h2>
+    <form id="csvForm">
+      <div class="row">
+        <div>
+          <label>صيغة البنك</label>
+          <select id="csvMapping">
+            <option value="bank-a">bank-a</option>
+            <option value="bank-b">bank-b</option>
+          </select>
+        </div>
+        <div>
+          <label>الملف</label>
+          <input type="file" id="csvFile" accept=".csv" required>
+        </div>
+        <button type="submit">رفع</button>
+      </div>
+      <div class="msg" id="csvMsg"></div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>رفع كشف حساب (PDF)</h2>
+    <form id="pdfForm">
+      <div class="row">
+        <div>
+          <label>الملف</label>
+          <input type="file" id="pdfFile" accept=".pdf" required>
+        </div>
+        <button type="submit">رفع</button>
+      </div>
+      <div class="msg" id="pdfMsg"></div>
+    </form>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:16px">
+  <h2>الملخص السنوي</h2>
+  <div class="row">
+    <div>
+      <label>السنة</label>
+      <input type="number" id="summaryYear" value="2026">
+    </div>
+    <div style="display:flex; align-items:center; gap:6px; flex:0;">
+      <input type="checkbox" id="includeTransfers" style="width:auto">
+      <label style="margin:0">تضمين التحويلات</label>
+    </div>
+    <button type="button" id="loadSummary" class="secondary">تحديث</button>
+  </div>
+  <div class="totals" id="summaryTotals"></div>
+  <div style="height:260px">
+    <canvas id="categoryChart"></canvas>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>المعاملات</h2>
+  <div class="row">
+    <div>
+      <label>من تاريخ</label>
+      <input type="date" id="filterFrom">
+    </div>
+    <div>
+      <label>إلى تاريخ</label>
+      <input type="date" id="filterTo">
+    </div>
+    <div>
+      <label>تصنيف</label>
+      <select id="filterCategory"><option value="">الكل</option></select>
+    </div>
+    <button type="button" id="applyFilter" class="secondary">تطبيق</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>التاريخ</th>
+        <th>الوصف</th>
+        <th>المبلغ</th>
+        <th>التصنيف</th>
+        <th>بواسطة</th>
+      </tr>
+    </thead>
+    <tbody id="txBody"></tbody>
+  </table>
+  <div class="pager">
+    <button type="button" id="prevPage" class="secondary">السابق</button>
+    <span id="pageInfo"></span>
+    <button type="button" id="nextPage" class="secondary">التالي</button>
+  </div>
+</div>
+
+<script>
+const API = '';
+let categories = [];
+let page = 0;
+const pageSize = 15;
+let totalPages = 1;
+let chart = null;
+
+async function fetchJson(url, options) {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${res.status}: ${text || res.statusText}`);
+  }
+  return res.json();
+}
+
+function setMsg(id, text, ok) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+}
+
+async function loadCategories() {
+  categories = await fetchJson(`${API}/categories`);
+  const sel = document.getElementById('filterCategory');
+  categories.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${c.nameAr} (${c.nameEn})`;
+    sel.appendChild(opt);
+  });
+}
+
+function categoryOptionsHtml(selectedId) {
+  let html = '<option value="">—</option>';
+  categories.forEach(c => {
+    const sel = String(c.id) === String(selectedId) ? 'selected' : '';
+    html += `<option value="${c.id}" ${sel}>${c.nameAr} (${c.nameEn})</option>`;
+  });
+  return html;
+}
+
+async function updateCategory(txId, categoryId, selectEl) {
+  try {
+    await fetchJson(`${API}/transactions/${txId}/category`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoryId: Number(categoryId) })
+    });
+    selectEl.style.borderColor = '#39c98f';
+    setTimeout(() => selectEl.style.borderColor = '', 800);
+  } catch (e) {
+    alert('فشل تحديث التصنيف: ' + e.message);
+  }
+}
+
+async function loadTransactions() {
+  const from = document.getElementById('filterFrom').value;
+  const to = document.getElementById('filterTo').value;
+  const category = document.getElementById('filterCategory').value;
+
+  const params = new URLSearchParams({ page, size: pageSize });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (category) params.set('category', category);
+
+  const data = await fetchJson(`${API}/transactions?${params.toString()}`);
+  totalPages = data.totalPages || 1;
+
+  const tbody = document.getElementById('txBody');
+  tbody.innerHTML = '';
+  data.content.forEach(tx => {
+    const tr = document.createElement('tr');
+    const amountClass = tx.direction === 'DEBIT' ? 'amount-debit' : 'amount-credit';
+    const sign = tx.direction === 'DEBIT' ? '-' : '+';
+    tr.innerHTML = `
+      <td>${tx.bookedOn}</td>
+      <td title="${tx.rawDescription}">${tx.normalisedDescription}</td>
+      <td class="${amountClass}">${sign}${Number(tx.amount).toFixed(2)}</td>
+      <td><select data-id="${tx.id}">${categoryOptionsHtml(tx.categoryId)}</select></td>
+      <td><span class="badge">${tx.categorisedBy}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', () => updateCategory(sel.dataset.id, sel.value, sel));
+  });
+
+  document.getElementById('pageInfo').textContent = `صفحة ${page + 1} من ${totalPages}`;
+  document.getElementById('prevPage').disabled = page === 0;
+  document.getElementById('nextPage').disabled = page + 1 >= totalPages;
+}
+
+async function loadSummary() {
+  const year = document.getElementById('summaryYear').value;
+  const includeTransfers = document.getElementById('includeTransfers').checked;
+  const data = await fetchJson(`${API}/summary/monthly?year=${year}&includeTransfers=${includeTransfers}`);
+
+  const categoryTotals = {};
+  let grandTotal = 0;
+  let txCount = 0;
+  data.months.forEach(m => {
+    grandTotal += m.total;
+    m.byCategory.forEach(c => {
+      categoryTotals[c.category] = (categoryTotals[c.category] || 0) + c.total;
+      txCount += c.count;
+    });
+  });
+
+  document.getElementById('summaryTotals').innerHTML = `
+    <div class="stat"><b>${grandTotal.toFixed(2)}</b>إجمالي الصرف (ريال)</div>
+    <div class="stat"><b>${txCount}</b>عدد المعاملات</div>
+    <div class="stat"><b>${data.months.length}</b>عدد الأشهر</div>
+  `;
+
+  const labels = Object.keys(categoryTotals);
+  const values = Object.values(categoryTotals);
+
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: ['#4f8dfd', '#39c98f', '#ef5b6a', '#f5a623', '#9b6ef3',
+                           '#2dd4bf', '#f472b6', '#facc15', '#60a5fa', '#a3e635']
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: '#e7ecf5' } } }
+    }
+  });
+}
+
+document.getElementById('csvForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const mapping = document.getElementById('csvMapping').value;
+  const file = document.getElementById('csvFile').files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const result = await fetchJson(`${API}/statements?mapping=${mapping}`, { method: 'POST', body: formData });
+    setMsg('csvMsg', `تم: ${result.inserted} جديد، ${result.duplicates} مكرر، ${result.errors.length} خطأ`, true);
+    loadTransactions(); loadSummary();
+  } catch (err) {
+    setMsg('csvMsg', 'فشل: ' + err.message, false);
+  }
+});
+
+document.getElementById('pdfForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = document.getElementById('pdfFile').files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const result = await fetchJson(`${API}/statements/pdf`, { method: 'POST', body: formData });
+    setMsg('pdfMsg', `تم: ${result.inserted} جديد، ${result.duplicates} مكرر، ${result.errors.length} خطأ`, true);
+    loadTransactions(); loadSummary();
+  } catch (err) {
+    setMsg('pdfMsg', 'فشل: ' + err.message, false);
+  }
+});
+
+document.getElementById('loadSummary').addEventListener('click', () => loadSummary().catch(e => alert(e.message)));
+document.getElementById('applyFilter').addEventListener('click', () => { page = 0; loadTransactions().catch(e => alert(e.message)); });
+document.getElementById('prevPage').addEventListener('click', () => { if (page > 0) { page--; loadTransactions(); } });
+document.getElementById('nextPage').addEventListener('click', () => { if (page + 1 < totalPages) { page++; loadTransactions(); } });
+
+(async function init() {
+  await loadCategories();
+  await loadTransactions().catch(e => console.error(e));
+  await loadSummary().catch(e => console.error(e));
+})();
+</script>
+
+</body>
+</html>
