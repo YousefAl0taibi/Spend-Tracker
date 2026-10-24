@@ -1,0 +1,12 @@
+data/*
+!data/.gitkeep
+*.csv
+!samples/*.csv
+!src/test/resources/**/*.csv
+.env
+
+target/
+*.class
+.idea/
+*.iml
+.vscode/

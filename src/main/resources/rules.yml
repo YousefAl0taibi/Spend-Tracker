@@ -1,0 +1,31 @@
+categories:
+  - name_en: Groceries
+    name_ar: بقالة
+    priority: 10
+    patterns: [TAMIMI, PANDA, OTHAIM, CARREFOUR, DANUBE, LULU]
+
+  - name_en: Fuel
+    name_ar: وقود
+    priority: 10
+    patterns: [ALDREES, SASCO, PETROMIN, NAFT]
+
+  - name_en: Dining
+    name_ar: مطاعم
+    priority: 20
+    patterns: [HUNGERSTATION, JAHEZ, TOYO, STARBUCKS, BARNS, DUNKIN]
+
+  - name_en: Subscriptions
+    name_ar: اشتراكات
+    priority: 5
+    patterns: [NETFLIX, SPOTIFY, APPLE.COM, GOOGLE, OPENAI, ANTHROPIC, AWS]
+
+  - name_en: Salary
+    name_ar: راتب
+    priority: 1
+    direction: CREDIT
+    patterns: [SALARY, رواتب, مستحقات]
+
+  - name_en: Uncategorised
+    name_ar: غير مصنف
+    priority: 9999
+    patterns: []

@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:spendtracker;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    defer-datasource-initialization: true
+  flyway:
+    enabled: false
+
+statement:
+  mappings:
+    bank-a:
+      date: "Transaction Date"
+      description: "Description"
+      debit: "Debit"
+      credit: "Credit"
+      dateFormat: "dd/MM/yyyy"
+    bank-b:
+      date: "Date"
+      description: "Narrative"
+      amount: "Amount"
+      dateFormat: "yyyy-MM-dd"

@@ -1,0 +1,31 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: spend-tracker
+  datasource:
+    url: jdbc:postgresql://localhost:5432/spendtracker
+    username: spend
+    password: spend
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+statement:
+  mappings:
+    bank-a:
+      date: "Transaction Date"
+      description: "Description"
+      debit: "Debit"
+      credit: "Credit"
+      dateFormat: "dd/MM/yyyy"
+    bank-b:
+      date: "Date"
+      description: "Narrative"
+      amount: "Amount"
+      dateFormat: "yyyy-MM-dd"
