@@ -1,0 +1,19 @@
+# Run for personal use on this machine, no Docker/PostgreSQL required:
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+#
+# Data persists in ./data/spendtracker-local.mv.db (already .gitignore'd).
+# Flyway is disabled here because V1__init.sql/V2__rules.sql use PostgreSQL-only
+# syntax (BIGSERIAL, TIMESTAMPTZ) never tested against H2; Hibernate builds the
+# schema from the entities instead, and CategorySeeder seeds the categories once.
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/spendtracker-local;MODE=PostgreSQL;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  flyway:
+    enabled: false

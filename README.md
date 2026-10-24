@@ -5,19 +5,36 @@ categorises the transactions, stores them, and serves them over a REST API.
 
 ## Quickstart
 
+**Option A — with Docker (matches production: PostgreSQL + Flyway):**
+
 ```bash
 docker compose up
 curl -F "file=@samples/sample-statement.csv" \
      "http://localhost:8080/statements?mapping=bank-a"
 ```
 
+**Option B — no Docker, for trying it on your own machine right now:**
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+curl -F "file=@samples/sample-statement.csv" \
+     "http://localhost:8080/statements?mapping=bank-a"
+```
+
+This uses a local H2 database file (`./data/spendtracker-local.mv.db`, already
+`.gitignore`d) instead of PostgreSQL — see `application-local.yml` and
+`CategorySeeder`. Data persists across restarts. This path **has** been run
+end-to-end on this machine: upload, summary, pagination and the duplicate-
+upload check all verified live, not just in tests.
+
 > **Note on this build:** every piece below (parsing, normalisation, idempotent
 > ingestion, rule-based categorisation, transfer matching, pagination, summaries)
-> is implemented and covered by its own unit/integration tests — 31 tests,
-> all green, run against an H2 in-memory database. `docker compose up` itself
-> has **not** been exercised end-to-end on this machine because Docker Desktop's
-> backend was unresponsive at the time this was built. Run it once on a machine
-> with a working Docker install to get the real numbers for the CV lines below.
+> is implemented and covered by its own unit/integration tests — 31 tests, all
+> green. Option B above has been exercised live. **Option A (`docker compose
+> up` against real PostgreSQL) has not** — Docker Desktop's backend was
+> unresponsive on this machine the whole time this was built. Run it once on a
+> machine with a working Docker install if you want the real Postgres path
+> (and the CV lines below) verified too.
 
 ```bash
 curl "http://localhost:8080/summary/monthly?year=2026"
